@@ -23,8 +23,9 @@ BMAG="${BLD}$(tput setaf 5)"
 BCYA="${BLD}$(tput setaf 6)"
 BWHI="${BLD}$(tput setaf 7)"
 DGRY="${RST}\e[90m"
+ORA="${RST}\e[38;5;202m"
 
-LIN=" ${MAG}─────────────────────────────────────────────────────"
+LIN=" ${MAG}───────────────────────────────────────────────────────────────"
 BUL=" ${MAG}- "
 SEP=" ${MAG}:${WHI} "
 
@@ -69,7 +70,14 @@ check_under_voltage(){
 
 VAR_MODEL="$( [ -f /proc/device-tree/model ] && tr -d '\0' </proc/device-tree/model || echo "$(uname -m) ($(uname -o))" )"
 VAR_UPTIME="$(uptime | sed -E 's/^[^,]*up *//; s/, *[[:digit:]]* user.*//; s/min/minutes/; s/([[:digit:]]+):0?([[:digit:]]+)/\1 hours, \2 minutes/')"
-VAR_IP_INTERN="$(hostname -I)"
+
+# LAN IP - excludes Docker/bridge interfaces (docker*, br-*, veth*) by default,
+# since a Docker host can have dozens of these; set SHOW_DOCKER_IPS=true to include them
+if [ "$SHOW_DOCKER_IPS" = "true" ]; then
+	VAR_IP_INTERN="$(hostname -I)"
+else
+	VAR_IP_INTERN="$(ip -o -4 addr show scope global 2>/dev/null | awk '$2 !~ /^(docker|br-|veth)/ {print $4}' | cut -d/ -f1 | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+fi
 VAR_IP_EXTERN="$(timeout --signal=SIGINT 3 wget -q -O - http://icanhazip.com/ | tail)"
 
 # WAN IP / VPN-leak check - only if a domain was configured
@@ -96,7 +104,7 @@ if command -v systemctl &>/dev/null; then
 	if [ "$failed_units" -eq 0 ]; then
 		VAR_FAILED_UNITS="${GRE}0"
 	else
-		VAR_FAILED_UNITS="${RED}${failed_units}"
+		VAR_FAILED_UNITS="${RED}${failed_units} ${DGRY}(systemctl --failed)"
 	fi
 fi
 
@@ -104,9 +112,12 @@ fi
 [ -f /var/run/reboot-required ] && VAR_REBOOT="${RED}YES"
 
 # VPN interface - shown whenever configured; a missing interface counts as DOWN
-# (wg-quick down removes it entirely, so absence and down are the same state)
+# (wg-quick down removes it entirely, so absence and down are the same state).
+# Note: point-to-point interfaces like WireGuard report "state UNKNOWN" even when
+# up (no carrier-detection for a virtual p2p link), so check the flag list instead.
 if [ -n "$VPN_IFACE" ]; then
-	if ip -o link show "$VPN_IFACE" 2>/dev/null | grep -q "state UP"; then
+	link_flags="$(ip -o link show "$VPN_IFACE" 2>/dev/null | grep -oP '(?<=<)[^>]+')"
+	if echo ",${link_flags}," | grep -q ',UP,'; then
 		VAR_VPN="${GRE}UP"
 	else
 		VAR_VPN="${RED}DOWN"
@@ -122,13 +133,26 @@ if command -v ufw &>/dev/null; then
 	fi
 fi
 
-# Docker - only if installed
+# Docker - only if installed; falls back to a configured socket-proxy (DOCKER_SOCKET_PROXY)
+# if the direct socket isn't reachable, and hides the line entirely if both fail
 if command -v docker &>/dev/null; then
-	VAR_DOCKER="$(docker ps -q | wc -l) running / $(docker ps -aq | wc -l) total"
+	docker_env=""
+	if ! docker ps -q &>/dev/null; then
+		if [ -n "$DOCKER_SOCKET_PROXY" ] && DOCKER_HOST="$DOCKER_SOCKET_PROXY" docker ps -q &>/dev/null; then
+			docker_env="DOCKER_HOST=$DOCKER_SOCKET_PROXY"
+		else
+			docker_env=""
+			docker_unavailable=true
+		fi
+	fi
+	if [ -z "$docker_unavailable" ]; then
+		VAR_DOCKER="$(env $docker_env docker ps -q | wc -l) running / $(env $docker_env docker ps -aq | wc -l) total"
+	fi
 fi
 
 VAR_WEATHER="$(curl -sSfLm 2 https://wttr.in/?format=4 2>&1)"
 VAR_AVAIL_UPDATES="$(( $(apt list --upgradable 2>/dev/null | wc -l) - 1 )) updates, $(apt list --upgradable 2>/dev/null | grep -ic security) Security"
+VAR_LAST_LOGIN="$(last 2>/dev/null | awk 'NR==3 {print $4, $5, $6, $7, $1, "from", $3}')"
 
 # fail2ban - failed-login log, only if it exists
 if [ -f /etc/fail2ban/logs/failed_logins.log ]; then
@@ -137,7 +161,16 @@ fi
 
 # fail2ban - currently banned IPs across all jails, only if the sudoers wrapper exists
 if [ -x /usr/local/sbin/f2b-status.sh ]; then
-	VAR_F2B_BANNED="$(sudo /usr/local/sbin/f2b-status.sh 2>/dev/null | sed -n 's/.*Currently banned:[[:space:]]*//p' | awk '{s+=$1} END{print s+0}')"
+	banned="$(sudo /usr/local/sbin/f2b-status.sh 2>/dev/null | sed -n 's/.*Currently banned:[[:space:]]*//p' | awk '{s+=$1} END{print s+0}')"
+	if [ "$banned" -eq 0 ]; then
+		VAR_F2B_BANNED="${GRE}0"
+	elif [ "$banned" -le 10 ]; then
+		VAR_F2B_BANNED="${YEL}${banned} ${DGRY}(sudo fail2ban-client status <jail>)"
+	elif [ "$banned" -le 20 ]; then
+		VAR_F2B_BANNED="${ORA}${banned} ${DGRY}(sudo fail2ban-client status <jail>)"
+	else
+		VAR_F2B_BANNED="${RED}${banned} ${DGRY}(sudo fail2ban-client status <jail>)"
+	fi
 fi
 
 # Last apt update - only if the log exists
@@ -165,6 +198,7 @@ echo -e "${BUL}${BWHI}Filesystem${SEP}${WHI}${VAR_SPACE}"
 echo -e "${BUL}${BWHI}Weather${SEP}${WHI}${VAR_WEATHER}"
 echo -e "${BUL}${BWHI}Updates${SEP}${WHI}${VAR_AVAIL_UPDATES}"
 [ -n "$VAR_LAST_APT" ] && echo -e "${BUL}${BWHI}Last Apt Update${SEP}${WHI}${VAR_LAST_APT}"
+[ -n "$VAR_LAST_LOGIN" ] && echo -e "${BUL}${BWHI}Last Login${SEP}${WHI}${VAR_LAST_LOGIN}"
 [ -n "$VAR_LAST_FAIL" ] && echo -e "${BUL}${BWHI}Last Failure${SEP}${WHI}${VAR_LAST_FAIL}"
 [ -n "$VAR_F2B_BANNED" ] && echo -e "${BUL}${BWHI}fail2ban Banned${SEP}${WHI}${VAR_F2B_BANNED}"
 echo -e "$LIN${RST}\n"

@@ -6,9 +6,14 @@ echo "=== MOTD Installer ==="
 
 # --- Docker ---
 HAS_DOCKER=false
+SHOW_DOCKER_IPS=false
+DOCKER_SOCKET_PROXY=""
 if command -v docker &>/dev/null; then
 	echo "Docker detected - will show container status."
 	HAS_DOCKER=true
+	read -rp "Docker/bridge interfaces (docker*, br-*, veth*) can flood the LAN IP line - show them anyway? [y/N]: " ans </dev/tty
+	[[ "$ans" =~ ^[Yy]$ ]] && SHOW_DOCKER_IPS=true
+	read -rp "Using a docker-socket-proxy instead of the local socket? Its address (e.g. tcp://127.0.0.1:2375), or blank to skip: " DOCKER_SOCKET_PROXY </dev/tty
 fi
 
 # Reads below use /dev/tty so prompts still work when this script is
@@ -34,6 +39,8 @@ echo "Deploying..."
 sudo tee /etc/motd-stats.conf > /dev/null <<EOF
 VPN_IFACE="$VPN_IFACE"
 MY_DOMAIN="$MY_DOMAIN"
+SHOW_DOCKER_IPS=$SHOW_DOCKER_IPS
+DOCKER_SOCKET_PROXY="$DOCKER_SOCKET_PROXY"
 EOF
 
 # Deploy the script - use a local copy if run from a cloned repo,
