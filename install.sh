@@ -4,30 +4,34 @@ set -e
 
 echo "=== MOTD Installer ==="
 
+# Grants passwordless sudo for one command to one (auto-created) group, and
+# adds the current user to it. Used for both UFW and fail2ban status checks.
+setup_nopasswd_group() {
+	local group="$1" alias_name="$2" cmd_path="$3"
+	sudo tee "/etc/sudoers.d/$group" > /dev/null <<EOF
+Cmnd_Alias      $alias_name = $cmd_path
+%$group    ALL=NOPASSWD: $alias_name
+EOF
+	sudo chmod 440 "/etc/sudoers.d/$group"
+	getent group "$group" > /dev/null || sudo groupadd -r "$group"
+	sudo gpasswd --add "$(whoami)" "$group" > /dev/null
+}
+
+# Reads below use /dev/tty so prompts still work when this script is
+# piped in via `curl ... | bash` (stdin is otherwise consumed by the script itself).
+
 # --- Docker ---
-HAS_DOCKER=false
 SHOW_DOCKER_IPS=false
 DOCKER_SOCKET_PROXY=""
 if command -v docker &>/dev/null; then
 	echo "Docker detected - will show container status."
-	HAS_DOCKER=true
 	read -rp "Docker/bridge interfaces (docker*, br-*, veth*) can flood the LAN IP line - show them anyway? [y/N]: " ans </dev/tty
 	[[ "$ans" =~ ^[Yy]$ ]] && SHOW_DOCKER_IPS=true
 	read -rp "Using a docker-socket-proxy instead of the local socket? Its address (e.g. tcp://127.0.0.1:2375), or blank to skip: " DOCKER_SOCKET_PROXY </dev/tty
 fi
 
-# Reads below use /dev/tty so prompts still work when this script is
-# piped in via `curl ... | bash` (stdin is otherwise consumed by the script itself).
-
 # --- VPN ---
 read -rp "VPN interface to monitor, e.g. wg0 (blank to skip): " VPN_IFACE </dev/tty
-
-# --- ntfy on updates ---
-read -rp "Send an ntfy notification after nightly apt updates? [y/N]: " ans </dev/tty
-NTFY_URL=""
-if [[ "$ans" =~ ^[Yy]$ ]]; then
-	read -rp "Full ntfy URL (e.g. https://ntfy.sh/mytopic): " NTFY_URL </dev/tty
-fi
 
 # --- Domain for VPN-leak / WAN IP check ---
 read -rp "Domain that resolves to this server's public IP, for a VPN-leak check (blank to skip): " MY_DOMAIN </dev/tty
@@ -79,6 +83,8 @@ sudo systemctl reload sshd 2>/dev/null || sudo systemctl reload ssh 2>/dev/null
 touch ~/.bash_aliases
 grep -qxF "alias motd='/usr/bin/scripts/motd-stats.sh'" ~/.bash_aliases || \
 	echo "alias motd='/usr/bin/scripts/motd-stats.sh'" >> ~/.bash_aliases
+sed -i '/^alias update=/d' ~/.bash_aliases
+echo 'alias update="sudo apt update && sudo apt upgrade -y"' >> ~/.bash_aliases
 grep -qxF "motd" ~/.bashrc || echo "motd" >> ~/.bashrc
 
 # RetroPie welcome message, if present and not already commented out
@@ -87,13 +93,7 @@ grep -q "^retropie_welcome" ~/.bashrc 2>/dev/null && \
 
 # UFW status without sudo password (only if ufw is installed)
 if command -v ufw &>/dev/null && [ ! -f /etc/sudoers.d/ufwstatus ]; then
-	sudo tee /etc/sudoers.d/ufwstatus > /dev/null <<'EOF'
-Cmnd_Alias      UFWSTATUS = /usr/sbin/ufw status
-%ufwstatus      ALL=NOPASSWD: UFWSTATUS
-EOF
-	sudo chmod 440 /etc/sudoers.d/ufwstatus
-	getent group ufwstatus > /dev/null || sudo groupadd -r ufwstatus
-	sudo gpasswd --add "$(whoami)" ufwstatus
+	setup_nopasswd_group ufwstatus UFWSTATUS "/usr/sbin/ufw status"
 fi
 
 # fail2ban status without sudo password (only if fail2ban-client is installed).
@@ -110,26 +110,18 @@ EOF
 	sudo chown root:root /usr/local/sbin/f2b-status.sh
 	sudo chmod 755 /usr/local/sbin/f2b-status.sh
 
-	if [ ! -f /etc/sudoers.d/fail2banstatus ]; then
-		sudo tee /etc/sudoers.d/fail2banstatus > /dev/null <<'EOF'
-Cmnd_Alias      F2BSTATUS = /usr/local/sbin/f2b-status.sh
-%f2banstatus    ALL=NOPASSWD: F2BSTATUS
-EOF
-		sudo chmod 440 /etc/sudoers.d/fail2banstatus
-		getent group f2banstatus > /dev/null || sudo groupadd -r f2banstatus
-		sudo gpasswd --add "$(whoami)" f2banstatus
-	fi
+	[ -f /etc/sudoers.d/fail2banstatus ] || \
+		setup_nopasswd_group f2banstatus F2BSTATUS "/usr/local/sbin/f2b-status.sh"
 fi
 
-# Update alias (+ optional ntfy notify)
-if [ -n "$NTFY_URL" ]; then
-	UPDATE_CMD="alias update=\"sudo apt update && sudo apt upgrade -y && curl $NTFY_URL -H 'ta: ballot_box_with_check' -H 't: APT Updates' -d '$(hostname) Update Completed'\""
-else
-	UPDATE_CMD="alias update=\"sudo apt update && sudo apt upgrade -y\""
+# Nightly cron apt update - install cron first if it's missing
+# (Ubuntu minimal cloud images don't ship it by default)
+if ! command -v crontab &>/dev/null; then
+	sudo apt-get update -qq
+	sudo apt-get install -y cron
+	sudo systemctl enable --now cron
 fi
-grep -qF "alias update=" ~/.bash_aliases || echo "$UPDATE_CMD" >> ~/.bash_aliases
-
-# Nightly cron apt update (idempotent)
+sudo touch /etc/crontab
 grep -q "apt update" /etc/crontab || \
 	echo -e "00 20\t* * *\troot\tapt update" | sudo tee -a /etc/crontab > /dev/null
 
