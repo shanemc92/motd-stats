@@ -24,7 +24,7 @@ script runs unmodified across hosts with different setups.
 Clone the repo and run:
 
 ```bash
-git clone https://github.com/shanemc92/motd-stats.git
+git clone https://github.com/<your-username>/motd-stats.git
 cd motd-stats
 bash install.sh
 ```
@@ -32,12 +32,13 @@ bash install.sh
 Or, on a fresh server, pull and run directly (keeps `read` prompts working):
 
 ```bash
-MOTD_STATS_URL="https://raw.githubusercontent.com/shanemc92/motd-stats/main/motd-stats.sh" \
-  bash <(curl -sL https://raw.githubusercontent.com/shanemc92/motd-stats/main/install.sh)
+MOTD_STATS_URL="https://raw.githubusercontent.com/<your-username>/motd-stats/main/motd-stats.sh" \
+  bash <(curl -sL https://raw.githubusercontent.com/<your-username>/motd-stats/main/install.sh)
 ```
 
-The installer asks a few questions and auto-detects the rest:
+The installer shows a live colour preview (7 options, each with a swatch dot) and asks:
 
+- Colour theme for separators/bullets/colons
 - VPN interface to monitor (blank to skip)
 - A domain resolving to this server's public IP, for the VPN-leak check (blank to skip)
 
@@ -53,6 +54,7 @@ duplicate aliases, cron entries, or sudoers files.
 Settings live in `/etc/motd-stats.conf`, written by the installer:
 
 ```bash
+THEME_COLOR="MAG"
 VPN_IFACE="wg0"
 MY_DOMAIN="example.com"
 SHOW_DOCKER_IPS=false
@@ -68,7 +70,8 @@ bash uninstall.sh
 ```
 
 Removes the deployed script, config, sudoers rules, groups, aliases, and cron
-entry.  `sshd_config` and `/etc/motd` are restored from the backups install.sh
+entry. (If cron was auto-installed by install.sh, the package itself is left in
+place — only our crontab entry is removed.) `sshd_config` and `/etc/motd` are restored from the backups install.sh
 made on first run.
 
 ## License

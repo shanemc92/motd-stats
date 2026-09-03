@@ -25,9 +25,20 @@ BWHI="${BLD}$(tput setaf 7)"
 DGRY="${RST}\e[90m"
 ORA="${RST}\e[38;5;202m"
 
-LIN=" ${MAG}───────────────────────────────────────────────────────────────"
-BUL=" ${MAG}- "
-SEP=" ${MAG}:${WHI} "
+# Separator/bullet colour theme, set by install.sh (defaults to magenta)
+case "$THEME_COLOR" in
+	CYA) THEME_CLR="$CYA" ;;
+	BLU) THEME_CLR="$BLU" ;;
+	GRE) THEME_CLR="$GRE" ;;
+	YEL) THEME_CLR="$YEL" ;;
+	RED) THEME_CLR="$RED" ;;
+	WHI) THEME_CLR="$WHI" ;;
+	*)   THEME_CLR="$MAG" ;;
+esac
+
+LIN=" ${THEME_CLR}───────────────────────────────────────────────────────────────"
+BUL=" ${THEME_CLR}- "
+SEP=" ${THEME_CLR}:${WHI} "
 
 CPU_TEMP(){
 	local tf=/sys/class/thermal/thermal_zone0/temp
