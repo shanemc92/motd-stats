@@ -25,20 +25,30 @@ BWHI="${BLD}$(tput setaf 15)"
 DGRY="${RST}\e[90m"
 ORA="${RST}\e[38;5;202m"
 
-# Separator/bullet colour theme, set by install.sh (defaults to magenta)
+# Standard (0-7) variants, used for bullets/separators - bright (8-15) above is used for lines
+RED_STD="${RST}$(tput setaf 1)"
+GRE_STD="${RST}$(tput setaf 2)"
+YEL_STD="${RST}$(tput setaf 3)"
+BLU_STD="${RST}$(tput setaf 4)"
+MAG_STD="${RST}$(tput setaf 5)"
+CYA_STD="${RST}$(tput setaf 6)"
+WHI_STD="${RST}$(tput setaf 7)"
+
+# Theme colour, set by install.sh (defaults to magenta): bright for the separator
+# lines, standard for bullets/colons so the lines stand out a bit more
 case "$THEME_COLOR" in
-	CYA) THEME_CLR="$CYA" ;;
-	BLU) THEME_CLR="$BLU" ;;
-	GRE) THEME_CLR="$GRE" ;;
-	YEL) THEME_CLR="$YEL" ;;
-	RED) THEME_CLR="$RED" ;;
-	WHI) THEME_CLR="$WHI" ;;
-	*)   THEME_CLR="$MAG" ;;
+	CYA) THEME_BRIGHT="$CYA"; THEME_STD="$CYA_STD" ;;
+	BLU) THEME_BRIGHT="$BLU"; THEME_STD="$BLU_STD" ;;
+	GRE) THEME_BRIGHT="$GRE"; THEME_STD="$GRE_STD" ;;
+	YEL) THEME_BRIGHT="$YEL"; THEME_STD="$YEL_STD" ;;
+	RED) THEME_BRIGHT="$RED"; THEME_STD="$RED_STD" ;;
+	WHI) THEME_BRIGHT="$WHI"; THEME_STD="$WHI_STD" ;;
+	*)   THEME_BRIGHT="$MAG"; THEME_STD="$MAG_STD" ;;
 esac
 
-LIN=" ${THEME_CLR}───────────────────────────────────────────────────────────────"
-BUL=" ${THEME_CLR}- "
-SEP=" ${THEME_CLR}:${WHI} "
+LIN=" ${THEME_BRIGHT}───────────────────────────────────────────────────────────────"
+BUL=" ${THEME_STD}- "
+SEP=" ${THEME_STD}:${WHI} "
 
 CPU_TEMP(){
 	local tf=/sys/class/thermal/thermal_zone0/temp

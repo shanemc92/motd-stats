@@ -23,15 +23,17 @@ EOF
 # --- Colour theme for separators/bullets/colons ---
 THEME_NAMES=(Magenta Cyan Blue Green Yellow Red White)
 THEME_CODES=(MAG CYA BLU GRE YEL RED WHI)
-THEME_TPUT=(13 14 12 10 11 9 15)
+THEME_BRIGHT_TPUT=(13 14 12 10 11 9 15)
+THEME_STD_TPUT=(5 6 4 2 3 1 7)
 RST_T="$(tput sgr0)"
 BW_T="$(tput bold)$(tput setaf 7)"
 W_T="$(tput setaf 7)"
-echo "Pick a colour theme for the MOTD separators/bullets (preview below):"
+echo "Pick a colour theme for the MOTD (lines use the bright shade, bullets/colons the standard shade):"
 for i in "${!THEME_NAMES[@]}"; do
-	c="$(tput setaf "${THEME_TPUT[$i]}")"
+	cb="$(tput setaf "${THEME_BRIGHT_TPUT[$i]}")"
+	cs="$(tput setaf "${THEME_STD_TPUT[$i]}")"
 	label="$(printf "%d) %-8s" "$((i+1))" "${THEME_NAMES[$i]}")"
-	echo -e "${label} ${c}●${RST_T}  ${c}──────── ${c}- ${BW_T}Example${c} :${W_T} Value${RST_T}"
+	echo -e "${label} ${cb}●${RST_T}  ${cb}──────── ${cs}- ${BW_T}Example${cs} :${W_T} Value${RST_T}"
 done
 read -rp "Choice [1-7, default 1]: " theme_choice </dev/tty
 theme_choice="${theme_choice:-1}"
