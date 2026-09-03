@@ -23,7 +23,7 @@ EOF
 # --- Colour theme for separators/bullets/colons ---
 THEME_NAMES=(Magenta Cyan Blue Green Yellow Red White)
 THEME_CODES=(MAG CYA BLU GRE YEL RED WHI)
-THEME_TPUT=(201 51 33 46 226 196 231)
+THEME_TPUT=(13 14 12 10 11 9 15)
 RST_T="$(tput sgr0)"
 BW_T="$(tput bold)$(tput setaf 7)"
 W_T="$(tput setaf 7)"
