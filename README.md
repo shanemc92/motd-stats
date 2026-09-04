@@ -3,7 +3,7 @@
 A login banner (MOTD) for Debian-based servers — Ubuntu, Raspbian/Raspberry Pi OS,
 and generic Debian — showing system, security, and ops stats over SSH.
 
-![screenshot](docs/screenshot.png
+![screenshot](docs/screenshot.png)
 
 ## Features
 
