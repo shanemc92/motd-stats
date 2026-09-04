@@ -4,19 +4,26 @@ set -e
 
 echo "=== MOTD Installer ==="
 
-# Grants passwordless sudo for one command to one (auto-created) group, and
-# adds the current user to it. Used for both UFW and fail2ban status checks.
-# Also removes any other sudoers.d file defining the same Cmnd_Alias first -
-# a duplicate alias anywhere in the directory breaks sudo entirely until it's
-# resolved, and this can happen if another script (e.g. a separate hardening
-# script) reuses the same alias name under a different filename.
-setup_nopasswd_group() {
-	local group="$1" alias_name="$2" cmd_path="$3"
+# Clean up any stale sudoers.d file defining our aliases before anything else
+# runs - a duplicate alias anywhere in the directory makes every subsequent
+# sudo call in this script (and everywhere else) print a warning until it's
+# resolved, so this has to happen before the first sudo call, not alongside
+# the group it belongs to. Can happen if another script (e.g. a separate
+# hardening script) reuses the same alias name under a different filename.
+for pair in "ufwstatus:UFWSTATUS" "f2banstatus:F2BSTATUS"; do
+	group="${pair%%:*}"
+	alias_name="${pair##*:}"
 	for f in /etc/sudoers.d/*; do
 		[ -f "$f" ] || continue
 		[ "$(basename "$f")" = "$group" ] && continue
 		grep -q "Alias.*\b${alias_name}\b" "$f" 2>/dev/null && sudo rm -f "$f"
 	done
+done
+
+# Grants passwordless sudo for one command to one (auto-created) group, and
+# adds the current user to it. Used for both UFW and fail2ban status checks.
+setup_nopasswd_group() {
+	local group="$1" alias_name="$2" cmd_path="$3"
 	sudo tee "/etc/sudoers.d/$group" > /dev/null <<EOF
 Cmnd_Alias      $alias_name = $cmd_path
 %$group    ALL=NOPASSWD: $alias_name
