@@ -11,7 +11,7 @@ sudo rm -f /usr/local/sbin/f2b-status.sh
 
 # sudoers + groups
 sudo rm -f /etc/sudoers.d/ufwstatus
-sudo rm -f /etc/sudoers.d/fail2banstatus
+sudo rm -f /etc/sudoers.d/f2banstatus
 sudo gpasswd --delete "$(whoami)" ufwstatus 2>/dev/null
 sudo gpasswd --delete "$(whoami)" f2banstatus 2>/dev/null
 sudo groupdel ufwstatus 2>/dev/null
