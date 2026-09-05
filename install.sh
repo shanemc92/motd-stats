@@ -128,7 +128,7 @@ grep -q "^retropie_welcome" ~/.bashrc 2>/dev/null && \
 	sed -i 's/^retropie_welcome/#retropie_welcome/' ~/.bashrc
 
 # UFW status without sudo password (only if ufw is installed)
-if command -v ufw &>/dev/null && [ ! -f /etc/sudoers.d/ufwstatus ]; then
+if command -v ufw &>/dev/null; then
 	setup_nopasswd_group ufwstatus UFWSTATUS "/usr/sbin/ufw status"
 fi
 
@@ -146,8 +146,7 @@ EOF
 	sudo chown root:root /usr/local/sbin/f2b-status.sh
 	sudo chmod 755 /usr/local/sbin/f2b-status.sh
 
-	[ -f /etc/sudoers.d/f2banstatus ] || \
-		setup_nopasswd_group f2banstatus F2BSTATUS "/usr/local/sbin/f2b-status.sh"
+	setup_nopasswd_group f2banstatus F2BSTATUS "/usr/local/sbin/f2b-status.sh"
 fi
 
 # Nightly cron apt update - install cron first if it's missing
